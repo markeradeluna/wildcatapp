@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="theme-color" content="#0E7458">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>PFT FITT Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: a three-step flow (Readiness → Test Results → Fitness Plan), one step on screen at a time, step bar on top */
+:root{
+  --bg:#EEF2EF; --surface:#FFFFFF; --sunk:#E3E9E5; --ink:#13201B; --muted:#56665F; --line:#D2DBD6;
+  --accent:#0E7458; --accent-ink:#FFFFFF; --accent-soft:#D6EDE4;
+  --r5:#1C8A57; --r4:#5D9F3A; --r3:#B8901A; --r2:#D46F25; --r1:#C23D36; --empty:#DCE3DF;
+  --stop-soft:#F8E1DE; --warn-soft:#F7EBCB;
+  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --f-data:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D1412; --surface:#15201C; --sunk:#1B2823; --ink:#E4ECE8; --muted:#97A8A0; --line:#28362F;
+  --accent:#3CC496; --accent-ink:#06261B; --accent-soft:#173A2E;
+  --r5:#3FC07E; --r4:#8BC45E; --r3:#E0BA45; --r2:#F0904C; --r1:#EE6A60; --empty:#26332D;
+  --stop-soft:#3A1E1C; --warn-soft:#3A3117; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D1412; --surface:#15201C; --sunk:#1B2823; --ink:#E4ECE8; --muted:#97A8A0; --line:#28362F;
+  --accent:#3CC496; --accent-ink:#06261B; --accent-soft:#173A2E;
+  --r5:#3FC07E; --r4:#8BC45E; --r3:#E0BA45; --r2:#F0904C; --r1:#EE6A60; --empty:#26332D;
+  --stop-soft:#3A1E1C; --warn-soft:#3A3117; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:.01em;text-wrap:balance;margin:0;line-height:1.1}
+h1{font-size:2.3rem;text-transform:uppercase}
+h2{font-size:1.45rem;text-transform:uppercase}
+h3{font-size:1.2rem}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.top p{margin:4px 0 0;color:var(--muted);max-width:62ch}
+.fitt-key{display:flex;gap:6px;flex-wrap:wrap}
+.fitt-key span{font-family:var(--f-display);font-weight:700;font-size:.95rem;border:1.5px solid var(--accent);color:var(--accent);border-radius:4px;padding:2px 8px;letter-spacing:.04em}
+.fitt-key b{font-size:1.15rem}
+
+/* step bar */
+.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.step{display:flex;align-items:center;gap:10px;text-align:left;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:10px 12px;cursor:pointer;font:inherit}
+.step .no{font-family:var(--f-display);font-weight:700;font-size:1.5rem;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--sunk);color:var(--muted);flex:none}
+.step .tx{display:flex;flex-direction:column;min-width:0}
+.step .tx b{font-family:var(--f-display);font-size:1.1rem;text-transform:uppercase;letter-spacing:.03em}
+.step .tx span{font-size:.8rem;color:var(--muted)}
+.step[aria-current="step"]{border-color:var(--accent);border-width:2px;padding:9px 11px}
+.step[aria-current="step"] .no{background:var(--accent);color:var(--accent-ink)}
+.step.done .no{background:var(--accent-soft);color:var(--accent)}
+.step:disabled{cursor:not-allowed;opacity:.55}
+.step:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:640px){.step .tx span{display:none}.step{padding:8px}.step .no{width:28px;height:28px;font-size:1.2rem}}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.panel-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.panel-head p{margin:0;color:var(--muted);font-size:.9rem}
+.stack{display:flex;flex-direction:column;gap:18px}
+.notice{background:var(--accent-soft);color:var(--ink);border-radius:6px;padding:8px 10px;font-size:.88rem}
+.lead{margin:0;max-width:72ch}
+
+/* form */
+fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;min-width:0}
+legend{font-family:var(--f-display);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:1.1rem;color:var(--accent);padding:0 0 4px;margin-bottom:8px;width:100%;border-bottom:2px solid var(--accent)}
+.sub{font-family:var(--f-display);font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:.9rem;color:var(--muted);margin:6px 0 -2px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.cols{display:grid;grid-template-columns:1fr;gap:24px}
+@media (min-width:860px){.cols{grid-template-columns:1fr 1fr}}
+.field{display:flex;flex-direction:column;gap:3px;min-width:0}
+.field label,.field .lb{font-weight:600;font-size:.9rem}
+.field small{color:var(--muted);font-size:.78rem;line-height:1.3}
+.inp{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:6px;background:var(--bg);overflow:hidden}
+.inp:focus-within{outline:2px solid var(--accent);outline-offset:1px}
+.inp input,.inp select{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:500 .95rem var(--f-data);padding:8px 10px;outline:none}
+.inp input[type=text],.inp input[type=date],.inp select{font-family:var(--f-body)}
+.inp .u{font:500 .78rem var(--f-data);color:var(--muted);padding:0 10px;display:flex;align-items:center;background:var(--sunk)}
+.readout{display:flex;align-items:center;gap:8px;min-height:38px;padding:0 10px;border:1px dashed var(--line);border-radius:6px;font:500 .95rem var(--f-data)}
+.btn{font:600 .9rem var(--f-body);border-radius:6px;padding:8px 14px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.btn:hover{border-color:var(--accent)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.nav{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+
+/* PAR-Q */
+.q{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:start;padding:10px 0;border-bottom:1px solid var(--line)}
+.q .n{font-family:var(--f-display);font-weight:700;font-size:1.3rem;color:var(--accent);line-height:1.2}
+.q p{margin:0}
+.q small{display:block;color:var(--muted);font-size:.8rem;margin-top:2px}
+.yn{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.yn input{position:absolute;opacity:0;pointer-events:none}
+.yn label{padding:6px 14px;cursor:pointer;font-weight:600;font-size:.88rem;background:var(--bg);color:var(--muted)}
+.yn label+input+label{border-left:1px solid var(--line)}
+.yn input:checked+label.y{background:var(--r1);color:#fff}
+.yn input:checked+label.no{background:var(--accent);color:var(--accent-ink)}
+.yn input:focus-visible+label{outline:2px solid var(--accent);outline-offset:-2px}
+@media (max-width:560px){.q{grid-template-columns:24px minmax(0,1fr)}.yn{grid-column:2;justify-self:start}}
+.status{border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.status b{font-family:var(--f-display);font-size:1.25rem;text-transform:uppercase;letter-spacing:.03em}
+.status p{margin:0;font-size:.92rem}
+.status.ok{background:var(--accent-soft)} .status.ok b{color:var(--accent)}
+.status.stop{background:var(--stop-soft)} .status.stop b{color:var(--r1)}
+.status.wait{background:var(--warn-soft)} .status.wait b{color:var(--r3)}
+.status.pending{background:var(--sunk)}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:.92rem}
+.check input{margin-top:4px;accent-color:var(--accent);width:16px;height:16px;flex:none}
+
+/* report */
+.student{display:flex;flex-wrap:wrap;gap:8px 24px;align-items:baseline}
+.student .nm{font-family:var(--f-display);font-weight:700;font-size:1.9rem;text-transform:uppercase}
+.kv{display:flex;flex-direction:column}
+.kv span{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.kv b{font:500 1rem var(--f-data);font-variant-numeric:tabular-nums}
+.profile{display:grid;grid-template-columns:1fr;gap:4px}
+@media (min-width:760px){.profile{grid-template-columns:1fr 1fr;column-gap:28px}}
+.pgroup{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pgroup h3{font-size:.95rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:6px 0 4px}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:7px 0;border-bottom:1px dashed var(--line)}
+.prow .c{font-weight:600}
+.prow .raw{font:500 .78rem var(--f-data);color:var(--muted);grid-column:1/-1}
+.meter{display:flex;gap:3px;align-items:center}
+.meter i{width:18px;height:10px;border-radius:2px;background:var(--empty)}
+.pill{font:700 .72rem var(--f-body);text-transform:uppercase;letter-spacing:.05em;padding:2px 7px;border-radius:999px;color:#fff;white-space:nowrap}
+.pill.s5{background:var(--r5)}.pill.s4{background:var(--r4)}.pill.s3{background:var(--r3)}.pill.s2{background:var(--r2)}.pill.s1{background:var(--r1)}
+.pill.s0{background:var(--empty);color:var(--muted)}
+.mr{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.fitt-list{display:grid;grid-template-columns:1fr;gap:14px}
+@media (min-width:1000px){.fitt-list{grid-template-columns:1fr 1fr}}
+.card{border:1px solid var(--line);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--bg);min-width:0}
+.card.priority{border-color:var(--r1);border-width:1.5px}
+.card-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.card-head p{margin:2px 0 0;color:var(--muted);font-size:.85rem}
+.fitt{display:grid;grid-template-columns:1fr;border-top:1px solid var(--line)}
+.fitt div{display:grid;grid-template-columns:34px minmax(0,1fr);gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+.fitt b{font-family:var(--f-display);font-size:1.5rem;line-height:1;color:var(--accent);text-align:center}
+.fitt span{font-size:.92rem}
+.fitt em{font-style:normal;display:block;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.ex{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:3px;font-size:.92rem}
+.prog{font-size:.85rem;color:var(--muted);margin:0}
+.prog b{color:var(--ink)}
+.week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.day{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:5px;min-height:110px}
+.day h4{margin:0;font-family:var(--f-display);font-size:1rem;text-transform:uppercase;letter-spacing:.05em}
+.chip{font-size:.78rem;font-weight:600;border-radius:4px;padding:3px 6px;background:var(--accent-soft);line-height:1.25}
+.chip.rest{background:transparent;color:var(--muted);font-weight:400;padding:0}
+@media (max-width:760px){.week{grid-template-columns:1fr}.day{min-height:0;flex-direction:row;flex-wrap:wrap;align-items:center}.day h4{width:44px}}
+.sports{display:grid;grid-template-columns:1fr;gap:12px}
+@media (min-width:760px){.sports{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.sport{border:1px solid var(--line);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
+.sport .rank{font:500 .75rem var(--f-data);color:var(--muted)}
+.sport .pct{font-family:var(--f-display);font-weight:700;font-size:2rem;color:var(--accent);line-height:1;font-variant-numeric:tabular-nums}
+.bar{height:6px;border-radius:3px;background:var(--empty);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.sport p{margin:0;font-size:.9rem}
+.also{font-size:.9rem;color:var(--muted);margin:0}
+.also b{color:var(--ink);font-weight:600}
+details{border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-weight:600}
+.tbl{overflow-x:auto;margin-top:10px}
+table{border-collapse:collapse;width:100%;font-size:.85rem;min-width:600px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+th{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+td.n{font-family:var(--f-data);font-variant-numeric:tabular-nums}
+.foot{font-size:.82rem;color:var(--muted);margin:0;max-width:80ch}
+.empty{color:var(--muted);margin:0}
+.toast{font-size:.85rem;color:var(--accent);font-weight:600}
+a{color:var(--accent)}
+.saved-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.saved-bar .inp{flex:1;min-width:180px}
+.rec-list{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.rec{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.rec.current{background:var(--accent-soft);padding-inline:10px;border-radius:6px}
+.rec .who{font-weight:700}
+.rec .meta{font:500 .78rem var(--f-data);color:var(--muted)}
+.rec .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.btn.sm{padding:5px 10px;font-size:.82rem}
+.btn.danger{color:var(--r1);border-color:var(--r1)}
+.btn.danger.solid{background:var(--r1);color:#fff}
+@media (max-width:520px){.rec{grid-template-columns:1fr}.rec .acts{justify-content:flex-start}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+.print-only{display:none}
+@media print{
+  :root{--bg:#fff!important;--surface:#fff!important;--sunk:#f1f3f2!important;--ink:#111!important;--muted:#555!important;--line:#ccc!important;
+    --accent:#0E7458!important;--accent-ink:#fff!important;--accent-soft:#E3F2EC!important;--empty:#e2e6e4!important;
+    --r5:#1C8A57!important;--r4:#5D9F3A!important;--r3:#B8901A!important;--r2:#D46F25!important;--r1:#C23D36!important;color-scheme:light}
+  @page{size:A4;margin:12mm}
+  body{padding:0!important;font-size:11.5px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .steps,#sampleNote,.btn,.toast,.top .fitt-key,#step1,#step2,.no-print,.row:has(#sampleBtn){display:none!important}
+  #step3{display:flex!important;gap:10px}
+  .print-only{display:block}
+  .panel{border:1px solid #ccc;padding:10px;gap:8px;break-inside:avoid}
+  .card,.sport,.prow,.day{break-inside:avoid}
+  .fitt-list{grid-template-columns:1fr 1fr}
+  .week{grid-template-columns:repeat(7,1fr)}
+  .day{min-height:0;flex-direction:column}
+  .sports{grid-template-columns:repeat(3,1fr)}
+  .profile{grid-template-columns:1fr 1fr}
+  details>summary{display:none}
+  .tbl{overflow:visible}
+  table{min-width:0}
+  h1{font-size:1.6rem}
+  a{color:inherit;text-decoration:none}
+}
+.sign{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:28px}
+.sign div{border-top:1px solid #333;padding-top:4px;font-size:.8rem;text-align:center}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>PFT FITT Planner</h1>
+      <p>Answer the readiness questionnaire, enter your Physical Fitness Test results, and get an exercise program built on the FITT Principle plus sports that match your strengths.</p>
+    </div>
+    <div class="row">
+      <div class="fitt-key" aria-label="FITT Principle"><span><b>F</b>requency</span><span><b>I</b>ntensity</span><span><b>T</b>ime</span><span><b>T</b>ype</span></div>
+    </div>
+  </header>
+
+  <nav class="steps" aria-label="Steps">
+    <button type="button" class="step" data-step="1"><span class="no">1</span><span class="tx"><b>Readiness</b><span>PAR-Q+ questionnaire</span></span></button>
+    <button type="button" class="step" data-step="2"><span class="no">2</span><span class="tx"><b>Test Results</b><span>Health and skill fitness</span></span></button>
+    <button type="button" class="step" data-step="3"><span class="no">3</span><span class="tx"><b>Fitness Plan</b><span>FITT program and sports</span></span></button>
+  </nav>
+
+  <div class="row" style="justify-content:space-between">
+    <div class="notice" id="sampleNote">You're looking at a <b>sample student</b>. Click "Start new student" to enter your own answers.</div>
+    <div class="row"><button type="button" class="btn" id="sampleBtn">Load sample</button><button type="button" class="btn" id="clearBtn">Start new student</button></div>
+  </div>
+
+  <form id="sheet" novalidate>
+  <!-- STEP 1 -->
+  <section class="stack" id="step1">
+    <div class="panel">
+      <div class="panel-head"><h2>Student Information</h2></div>
+      <div class="grid2">
+        <div class="field"><label for="name">Full name</label><div class="inp"><input id="name" type="text" autocomplete="off" placeholder="e.g. Maria Santos"></div></div>
+        <div class="field"><label for="section">Grade and section</label><div class="inp"><input id="section" type="text" autocomplete="off" placeholder="e.g. Grade 8 – Rizal"></div></div>
+        <div class="field"><label for="age">Age</label><div class="inp"><input id="age" type="number" min="8" max="60" inputmode="numeric"><span class="u">yrs</span></div></div>
+        <div class="field"><label for="sex">Sex</label><div class="inp"><select id="sex"><option value="M">Male</option><option value="F">Female</option></select></div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Physical Activity Readiness Questionnaire (PAR-Q+)</h2><p>Answer honestly: Yes or No</p></div>
+      <p class="lead">These questions check whether it is safe for you to take the fitness test and start a new exercise program. Ask your parent or guardian to help you answer.</p>
+      <div id="parq"></div>
+      <div class="sub">Today</div>
+      <div id="parqToday"></div>
+      <div class="status pending" id="parqStatus" aria-live="polite"></div>
+      <div id="clearanceBox" hidden>
+        <label class="check"><input type="checkbox" id="clearance"> <span>A doctor or qualified health professional has checked me and cleared me for physical activity. My PE teacher has seen the written clearance.</span></label>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Declaration</h2></div>
+      <div class="grid2">
+        <div class="field"><label for="guardian">Parent or guardian name</label><div class="inp"><input id="guardian" type="text" autocomplete="off"></div><small>Required for students under 18</small></div>
+        <div class="field"><label for="pdate">Date</label><div class="inp"><input id="pdate" type="date"></div></div>
+      </div>
+      <label class="check"><input type="checkbox" id="agree"> <span>I have read and answered every question honestly. If my health changes, I will tell my PE teacher before taking part in physical activity.</span></label>
+      <p class="foot">Questions are adapted from the PAR-Q+ (Physical Activity Readiness Questionnaire for Everyone). The full official form and its follow-up pages are free at <a href="https://eparmedx.com" target="_blank" rel="noopener">eparmedx.com</a>.</p>
+      <div class="nav"><span></span><button type="button" class="btn primary" id="to2">Continue to test results</button></div>
+    </div>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="stack" id="step2" hidden>
+    <div class="panel">
+      <div class="panel-head"><h2>Physical Fitness Test Results</h2><p>Leave a box empty if the test wasn't taken</p></div>
+      <div class="cols">
+        <fieldset id="healthFs">
+          <legend>Health-Related Fitness</legend>
+          <div class="sub">Age</div>
+          <div class="field"><span class="lb">Age</span><div class="readout" id="ageReadout">–</div><small>From Student Information in step 1</small></div>
+          <div class="sub">Body composition</div>
+          <div class="grid2">
+            <div class="field"><label for="height">Height</label><div class="inp"><input id="height" type="number" step="0.1" inputmode="decimal"><span class="u">cm</span></div></div>
+            <div class="field"><label for="weight">Weight</label><div class="inp"><input id="weight" type="number" step="0.1" inputmode="decimal"><span class="u">kg</span></div></div>
+          </div>
+          <div class="field"><span class="lb">BMI</span><div class="readout" id="bmiReadout">–</div><small>Calculated automatically: weight (kg) ÷ height (m)²</small></div>
+        </fieldset>
+        <fieldset id="skillFs"><legend>Skill-Related Fitness</legend></fieldset>
+      </div>
+      <div class="nav"><button type="button" class="btn" id="back1">Back</button><button type="button" class="btn primary" id="to3">See my fitness plan</button></div>
+    </div>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="stack" id="step3" hidden>
+    <div class="panel">
+      <div class="student" id="student"></div>
+      <div class="row"><button type="button" class="btn primary" id="printBtn">Print results</button><button type="button" class="btn" id="copyBtn">Copy summary</button><button type="button" class="btn" id="back2">Edit test results</button><span class="toast" id="toast" role="status"></span></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>Fitness Profile</h2><p>Ratings from 1 (needs improvement) to 5 (excellent)</p></div>
+      <div class="profile" id="profile"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>FITT Exercise Program</h2><p id="fittIntro"></p></div>
+      <div class="fitt-list" id="fittList"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>Sample Week</h2><p>Warm up 5–10 min before and cool down after every session.</p></div>
+      <div class="week" id="week"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>Sports That Fit</h2><p>Matched to the strongest fitness components</p></div>
+      <div class="sports" id="sports"></div>
+      <p class="also" id="alsoFit"></p>
+    </div>
+    <div class="panel">
+      <details open><summary>Rating guide used for each test</summary><div class="tbl" id="guide"></div></details>
+      <p class="foot">Ratings use general guide ranges, simplified for secondary students. If your school uses official age- and sex-specific PFT norms, follow those. BMI uses the standard categories; for growing teens, a health professional should confirm with BMI-for-age charts.</p>
+    </div>
+    <div class="panel print-only">
+      <p class="foot" id="printDate"></p>
+      <div class="sign"><div>Student signature</div><div>Parent / guardian signature</div><div>PE teacher signature</div></div>
+    </div>
+  </section>
+  </form>
+
+  <section class="panel no-print" id="savedPanel">
+    <div class="panel-head"><h2>Saved Records</h2><p id="savedCount"></p></div>
+    <div class="saved-bar">
+      <button type="button" class="btn primary" id="saveBtn">Save this student</button>
+      <div class="inp"><input id="recSearch" type="text" autocomplete="off" placeholder="Search by name or section" aria-label="Search saved records"></div>
+      <span class="toast" id="saveToast" role="status"></span>
+    </div>
+    <div class="rec-list" id="recList"></div>
+    <p class="foot">Records are saved on this device only. Saving a student you loaded updates that record; use "Start new student" before entering a different student.</p>
+  </section>
+</div>
+
+<script>
+const LABELS = {5:'Excellent',4:'Very good',3:'Good',2:'Fair',1:'Needs improvement',0:'Not tested'};
+const COMPS = {
+  flexibility:{name:'Flexibility', kind:'health'},
+  strength:{name:'Strength', kind:'health'},
+  cardio:{name:'Cardiovascular endurance', kind:'health'},
+  reaction:{name:'Reaction time', kind:'skill'},
+  balance:{name:'Balance', kind:'skill'},
+  coordination:{name:'Coordination', kind:'skill'},
+  power:{name:'Power', kind:'skill'},
+  agility:{name:'Agility and speed', kind:'skill'}
+};
+// bands = thresholds for [Excellent, Very good, Good, Fair]; lower:true means a smaller number is better
+const TESTS = [
+  {id:'zipper', name:'Zipper Test', comp:'flexibility', unit:'cm', step:0.1, hint:'Overlap = positive, gap = negative. Use the better side.', bands:{M:[6,4,2,0],F:[6,4,2,0]}},
+  {id:'sitreach', name:'Sit and Reach Test', comp:'flexibility', unit:'cm', step:0.1, hint:'Best of two trials', bands:{M:[61,46,31,16],F:[61,46,31,16]}},
+  {id:'pushup', name:'Push-up', comp:'strength', unit:'reps', step:1, hint:'Correct 90° push-ups until form breaks', bands:{M:[26,20,15,9],F:[20,15,10,5]}},
+  {id:'plank', name:'Basic Plank', comp:'strength', unit:'sec', step:1, hint:'Hold time with a straight body (max 60 s)', bands:{M:[51,46,31,16],F:[51,46,31,16]}},
+  {id:'step', name:'3-Minute Step Test', comp:'cardio', unit:'bpm', step:1, lower:true, hint:'Pulse counted for 60 s right after stepping', bands:{M:[84,99,114,129],F:[89,104,119,134]}},
+  {id:'stick', name:'Stick Drop Test', comp:'reaction', unit:'cm', step:0.01, lower:true, hint:'Middle value of three trials', bands:{M:[2.54,15.24,30.4,45.6],F:[2.54,15.24,30.4,45.6]}},
+  {id:'stork', name:'Stork Balance Stand Test', comp:'balance', unit:'sec', step:1, hint:'Total of best right-foot and left-foot holds', bands:{M:[121,81,41,11],F:[121,81,41,11]}},
+  {id:'wall', name:'Hand-Eye Coordination Test', comp:'coordination', unit:'catches', step:1, hint:'Alternate-hand tennis ball toss to a wall 3 m away, catches in 30 s', bands:{M:[35,30,20,15],F:[35,30,20,15]}},
+  {id:'jump', name:'Standing Long Jump', comp:'power', unit:'cm', step:1, hint:'Best of two jumps', bands:{M:[220,190,165,140],F:[185,160,140,120]}},
+  {id:'illinois', name:'Illinois Agility Run Test', comp:'agility', unit:'sec', step:0.1, lower:true, hint:'Time to complete the course', bands:{M:[15.1,16.1,18.1,19.3],F:[16.9,17.9,21.7,23.0]}}
+];
+const PARQ = [
+  {id:'q1', t:'Has a doctor ever said that you have a heart condition or high blood pressure?'},
+  {id:'q2', t:'Do you feel pain in your chest when resting, during daily activities, or when you do physical activity?'},
+  {id:'q3', t:'Do you lose your balance because of dizziness, or have you fainted in the last 12 months?', s:'Answer No if the dizziness only came from breathing hard during intense exercise.'},
+  {id:'q4', t:'Has a doctor ever told you that you have another long-term medical condition, such as asthma, diabetes or epilepsy?'},
+  {id:'q5', t:'Are you currently taking prescribed medicine for a long-term medical condition?'},
+  {id:'q6', t:'Do you have, or have you had in the last 12 months, a bone, joint or muscle problem that could get worse with more physical activity?', s:'Answer No if it was a past injury that no longer limits you.'},
+  {id:'q7', t:'Has a doctor ever said that you should only do physical activity under medical supervision?'}
+];
+const TODAY = {id:'q8', t:'Do you have a fever, cold or other illness right now, or an injury that has not healed yet?'};
+const SAMPLE = {name:'Juan Dela Cruz (sample)', section:'Grade 8 – Rizal', age:14, sex:'M', guardian:'Rosa Dela Cruz', pdate:'2026-11-06', agree:true, clearance:false,
+  q1:'no',q2:'no',q3:'no',q4:'no',q5:'no',q6:'no',q7:'no',q8:'no',
+  height:158, weight:58, zipper:-3, sitreach:29, pushup:12, plank:28, step:118, stick:12.5, stork:64, wall:27, jump:198, illinois:17.2};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ---------- build form ----------
+function testField(t){ return `<div class="field"><label for="${t.id}">${t.name}</label>
+  <div class="inp"><input id="${t.id}" type="number" step="${t.step}" inputmode="decimal"><span class="u">${t.unit}</span></div><small>${t.hint}</small></div>`; }
+function buildInputs(){
+  const hs = $('healthFs');
+  hs.insertAdjacentHTML('beforeend', `<div class="sub">Flexibility</div>${testField(TESTS[0])}${testField(TESTS[1])}
+    <div class="sub">Strength</div>${testField(TESTS[2])}${testField(TESTS[3])}
+    <div class="sub">Cardiovascular endurance</div>${testField(TESTS[4])}`);
+  const groups = [['Reaction time','reaction'],['Balance','balance'],['Coordination','coordination'],['Power','power'],['Agility and speed','agility']];
+  $('skillFs').insertAdjacentHTML('beforeend', groups.map(([g,c])=>`<div class="sub">${g}</div>`+TESTS.filter(t=>t.comp===c).map(testField).join('')).join(''));
+  const q = (x,n) => `<div class="q"><span class="n">${n}</span><p>${x.t}${x.s?`<small>${x.s}</small>`:''}</p>
+    <div class="yn" role="radiogroup" aria-label="Question ${n}">
+      <input type="radio" name="${x.id}" id="${x.id}y" value="yes"><label class="y" for="${x.id}y">Yes</label>
+      <input type="radio" name="${x.id}" id="${x.id}n" value="no"><label class="no" for="${x.id}n">No</label></div></div>`;
+  $('parq').innerHTML = PARQ.map((x,i)=>q(x,i+1)).join('');
+  $('parqToday').innerHTML = q(TODAY,8);
+}
+const NUMS = ['age','height','weight',...TESTS.map(t=>t.id)];
+const TEXTS = ['name','section','sex','guardian','pdate'];
+const CHECKS = ['agree','clearance'];
+const RADIOS = [...PARQ.map(q=>q.id),'q8'];
+function readVals(){
+  const v={};
+  TEXTS.forEach(f=>v[f]=$(f).value.trim());
+  NUMS.forEach(f=>{const r=$(f).value.trim(); v[f]=r===''?null:parseFloat(r);});
+  CHECKS.forEach(f=>v[f]=$(f).checked);
+  RADIOS.forEach(f=>{const c=document.querySelector(`input[name="${f}"]:checked`); v[f]=c?c.value:null;});
+  return v;
+}
+function fill(v){
+  TEXTS.forEach(f=>$(f).value = v[f] ?? (f==='sex'?'M':''));
+  NUMS.forEach(f=>$(f).value = v[f]==null?'':v[f]);
+  CHECKS.forEach(f=>$(f).checked = !!v[f]);
+  RADIOS.forEach(f=>document.querySelectorAll(`input[name="${f}"]`).forEach(r=>r.checked = r.value===v[f]));
+}
+
+// ---------- PAR-Q logic ----------
+function readiness(v){
+  const answered = PARQ.filter(q=>v[q.id]).length + (v.q8?1:0);
+  const yes = PARQ.filter(q=>v[q.id]==='yes').map((q,i)=>PARQ.indexOf(q)+1);
+  const needGuardian = !(v.age>=18);
+  const missingDecl = !v.agree || (needGuardian && !v.guardian);
+  if(answered < 8) return {state:'pending', msg:`Answer all 8 questions (${answered} of 8 done).`};
+  if(v.q8==='yes') return {state:'wait', yes, msg:'Wait until you are well or your injury has healed before taking the fitness test. Tell your PE teacher so you can take it on another day.'};
+  if(yes.length && !v.clearance) return {state:'stop', yes, msg:`You answered Yes to question ${yes.join(', ')}. Before taking the fitness test, see a doctor or qualified health professional and get written clearance for physical activity. Show it to your PE teacher, then tick the box below.`};
+  if(missingDecl) return {state:'decl', yes, msg:`You're cleared by your answers. Finish the declaration below${needGuardian?' (agreement and parent or guardian name)':''} to continue.`};
+  return {state:'ok', yes, msg: yes.length ? 'Cleared with medical clearance. Follow any limits your doctor gave you during the test.' : 'You answered No to every question. You can take the Physical Fitness Test. Start slowly and stop if you feel unwell.'};
+}
+
+// ---------- scoring ----------
+function rate(val,b,lower){ if(val==null||isNaN(val)) return 0; for(let i=0;i<4;i++){ if(lower?val<=b[i]:val>=b[i]) return 5-i; } return 1; }
+function bmiInfo(v){ if(!v.height||!v.weight) return null; const b=v.weight/Math.pow(v.height/100,2);
+  return {val:b, cat:b<18.5?'Underweight':b<25?'Normal':b<30?'Overweight':'Obese'}; }
+function compute(v){
+  const sex=v.sex==='F'?'F':'M', comps={};
+  Object.keys(COMPS).forEach(k=>comps[k]={score:0,tests:[]});
+  TESTS.forEach(t=>comps[t.comp].tests.push({t,val:v[t.id],score:rate(v[t.id],t.bands[sex],t.lower)}));
+  Object.values(comps).forEach(c=>{const tk=c.tests.filter(x=>x.score); c.score=tk.length?Math.round(tk.reduce((a,x)=>a+x.score,0)/tk.length):0;});
+  return {comps,bmi:bmiInfo(v),sex};
+}
+
+// ---------- FITT library ----------
+function fitt(key,score,v,res){
+  const beg=score<=2, age=v.age||14, hrMax=220-age;
+  const sub = id => { const c=res.comps[TESTS.find(t=>t.id===id).comp]; return (c.tests.find(x=>x.t.id===id)||{}).score||0; };
+  const L={
+    cardio:()=>{const lo=Math.round(hrMax*(beg?.6:.7)),hi=Math.round(hrMax*(beg?.7:.85));
+      return {days:beg?3:4,F:`${beg?'3':'4–5'} days a week`,I:`Moderate${beg?'':' to vigorous'}: ${lo}–${hi} beats per minute (${beg?'60–70':'70–85'}% of max heart rate). You can talk but not sing.`,
+      T:`${beg?'20–25':'30–40'} minutes per session`,Ty:'Continuous rhythmic activity: jogging, jump rope, cycling, aerobic dance, swimming',
+      ex:beg?['Brisk walk 5 min to warm up','Jog 1 min, walk 2 min × 6 rounds','Jump rope 3 × 1 min, rest 1 min','Step-ups on a low bench 2 × 1 min']
+            :['Easy jog 5 min to warm up','Jog 3 min, fast run 1 min × 5 rounds','Jump rope 4 × 2 min','Step-ups on a bench 3 × 1 min'],
+      prog:'Add 5 minutes every 2 weeks. When 30 minutes feels comfortable, pick up the pace. Re-check with the 3-minute step test after 6 weeks.'};},
+    strength:()=>{const p=sub('pushup'),k=sub('plank'); const core = k && (!p || k<p);
+      return {days:3,F:'3 days a week, never two days in a row',I:`${beg?'Easier versions, 2 sets':'Standard or harder versions, 3 sets'} of 8–12 reps or holds, stopping before form breaks`,
+      T:'20–30 minutes per session',Ty:`Bodyweight strength exercises for the ${core?'core, plus the arms and chest':'arms, chest and shoulders, plus the core'}`,
+      ex: core ? (beg?['Front plank 3 × 20 s','Side plank on knees 2 × 15 s each side','Glute bridge 3 × 12','Knee push-ups 2 × 8']
+                     :['Front plank 3 × 45 s','Side plank 3 × 30 s each side','Dead bug 3 × 12','Push-ups 3 × 10'])
+               : (beg?['Wall push-ups 2 × 12','Knee push-ups 2 × 8','Chair dips 2 × 8','Front plank 3 × 20 s']
+                     :['Full push-ups 3 × 10','Decline push-ups 3 × 8','Chair dips 3 × 12','Front plank 3 × 45 s']),
+      prog:'When every set feels easy, move to the next harder push-up version or add 10 seconds to each plank, up to 60 seconds.'};},
+    flexibility:()=>{const z=sub('zipper'),s=sub('sitreach'); const sh=z && (!s || z<=s);
+      return {days:6,F:'5–7 days a week, best after exercise',I:'Stretch to mild tension, never pain',T:'Hold each stretch 20–30 s, 2–4 times; 10–15 minutes total',
+      Ty:`Static stretching, focusing on the ${sh?'shoulders (zipper test)':'hamstrings and lower back (sit and reach)'}`,
+      ex:sh?['Towel stretch behind the back','Cross-body shoulder stretch','Overhead triceps stretch','Doorway chest stretch','Seated sit-and-reach stretch']
+           :['Seated sit-and-reach stretch','Standing hamstring stretch','Butterfly stretch','Cat–cow for the lower back','Towel stretch for the shoulders'],
+      prog:'Re-test every 4 weeks. Aim to gain 2–3 cm a month.'};},
+    reaction:()=>({days:3,F:'3 days a week',I:'Fully alert, react as fast as you can',T:'10–15 minutes',Ty:'Catching and react-to-signal drills with a partner',
+      ex:['Stick or ruler drop catches 10 × each hand','Partner ball drop catches 10 ×','Reaction starts on a clap 6 × 5 m','Tennis ball wall bounce catches 2 × 1 min'],prog:'Shorten the distance or speed up the signal as catches get easier.'}),
+    balance:()=>({days:4,F:'3–5 days a week',I:'Start with eyes open on a flat floor, then close your eyes or stand on a cushion',T:'10 minutes',Ty:'Static and moving balance exercises',
+      ex:['Single-leg stand 3 × 30 s each leg','Stork stand on the ball of the foot 3 × each leg','Heel-to-toe walk 3 × 5 m','Tree pose 3 × 20 s'],prog:'Make one exercise harder every week (eyes closed, soft surface, or reaching).'}),
+    coordination:()=>({days:3,F:'3–4 days a week',I:'Steady rhythm first, then faster',T:'10–15 minutes',Ty:'Hand–eye and foot–eye skill practice',
+      ex:['Alternate-hand wall toss 3 × 30 s','Two-ball toss and catch 3 × 1 min','Jump rope patterns 3 × 1 min','Dribbling figure-8 3 × 30 s'],prog:'Count catches every week. Add a new pattern when you reach 30 catches in 30 s.'}),
+    power:()=>({days:2,F:'2 days a week, never two days in a row',I:'Maximum effort, low volume, full rest between sets',T:'15–20 minutes',Ty:'Jumps and explosive movements',
+      ex:['Squat jumps 3 × 6','Standing broad jumps 3 × 5','Skipping bounds 3 × 15 m','Chest pass throws with a ball 3 × 8'],prog:'Measure your best broad jump each week and try to beat it.'}),
+    agility:()=>({days:3,F:'2–3 days a week, when fresh',I:'As fast as possible while staying in control, with full rest between runs',T:'15–20 minutes',Ty:'Sprints and change-of-direction footwork drills',
+      ex:['Sprints 6 × 20 m','Weave run through 4 cones × 4','Side shuffles 4 × 10 m','Shuttle run (5-10-5) × 4','Illinois course practice × 2'],prog:'Time one run each week and try to beat your time.'}),
+    bodyOver:()=>({days:6,F:'Every day',I:'Moderate to vigorous (breathing hard, heart beating faster)',T:'60 minutes a day in total; it can be split into shorter bouts',
+      Ty:'Active play, brisk walking, cycling, sports and dance, plus less sitting time',
+      ex:['Walk or bike to school when safe','30-minute active game or sport','Two 10-minute activity breaks after study','Limit recreational screen time to 2 hours'],prog:'Build up activity gradually. Plan healthy eating habits with a parent or the school nurse.'}),
+    bodyUnder:()=>({days:3,F:'3 days a week of strength work, plus daily activity',I:'Moderate; avoid long, very intense cardio',T:'30 minutes per session',Ty:'Strength-building bodyweight exercises',
+      ex:['Bodyweight squats 3 × 10','Knee or full push-ups 3 × 8','Glute bridges 3 × 12','Plank 3 × 20 s'],prog:'Talk with a parent or the school nurse about regular, balanced meals to support growth.'})
+  };
+  return L[key]();
+}
+
+// ---------- sports ----------
+const SPORTS = [
+  {n:'Basketball',w:{agility:.3,power:.25,coordination:.2,cardio:.15,reaction:.1}},
+  {n:'Volleyball',w:{power:.3,reaction:.2,coordination:.2,agility:.15,strength:.15}},
+  {n:'Football (soccer)',w:{cardio:.35,agility:.35,coordination:.15,balance:.15}},
+  {n:'Badminton',w:{agility:.4,reaction:.25,coordination:.2,cardio:.15}},
+  {n:'Table tennis',w:{reaction:.4,coordination:.35,agility:.15,balance:.1}},
+  {n:'Sepak takraw',w:{flexibility:.25,power:.2,coordination:.2,balance:.2,agility:.15}},
+  {n:'Sprints and jumps (athletics)',w:{agility:.45,power:.4,reaction:.15}},
+  {n:'Distance running',w:{cardio:.7,strength:.3}},
+  {n:'Swimming',w:{cardio:.4,strength:.35,flexibility:.25}},
+  {n:'Gymnastics',w:{strength:.4,flexibility:.3,balance:.3}},
+  {n:'Arnis',w:{reaction:.3,coordination:.3,agility:.25,strength:.15}},
+  {n:'Taekwondo',w:{flexibility:.3,agility:.3,power:.2,balance:.2}},
+  {n:'Dance sport',w:{balance:.3,coordination:.3,flexibility:.2,cardio:.2}},
+  {n:'Softball / baseball',w:{coordination:.3,reaction:.3,power:.25,agility:.15}}
+];
+function matchSports(comps){
+  return SPORTS.map(sp=>{let sum=0,wt=0;const parts=[];
+    Object.entries(sp.w).forEach(([k,w])=>{const s=comps[k].score; if(s){sum+=w*s;wt+=w;parts.push({k,s,w});}});
+    parts.sort((a,b)=>b.s*b.w-a.s*a.w||b.s-a.s);
+    return {...sp,pct:wt>=.5?Math.round(sum/wt/5*100):null,parts};
+  }).filter(x=>x.pct!=null).sort((a,b)=>b.pct-a.pct);
+}
+
+// ---------- steps ----------
+let cur = 1;
+function canGo(n,r){ return n===1 || r.state==='ok'; }
+function go(n){
+  const r = readiness(readVals());
+  if(!canGo(n,r)) return;
+  cur=n; [1,2,3].forEach(i=>$('step'+i).hidden = i!==n);
+  updateSteps(r); window.scrollTo({top:0});
+}
+function updateSteps(r){
+  document.querySelectorAll('.step').forEach(b=>{const n=+b.dataset.step;
+    b.toggleAttribute('aria-current', n===cur); if(n===cur) b.setAttribute('aria-current','step');
+    b.disabled = !canGo(n,r); b.classList.toggle('done', n<cur);});
+}
+
+// ---------- render ----------
+const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const PATTERNS={2:[[1,4],[0,3],[2,5]],3:[[0,2,4],[1,3,5]],4:[[0,1,3,4],[1,2,4,5]],5:[[0,1,2,3,4]],6:[[0,1,2,3,4,5]]};
+let lastText='';
+function render(){
+  const v=readVals(), r=readiness(v), res=compute(v), {comps,bmi}=res;
+
+  // step 1 status
+  const titles={pending:'Not finished',wait:'Not today',stop:'See a doctor first',decl:'Almost done',ok:'Ready for the fitness test'};
+  const st=$('parqStatus'); st.className='status '+({pending:'pending',wait:'wait',stop:'stop',decl:'pending',ok:'ok'}[r.state]);
+  st.innerHTML=`<b>${titles[r.state]}</b><p>${r.msg}</p>`;
+  $('clearanceBox').hidden = !(r.yes && r.yes.length) || r.state==='wait';
+  $('to2').disabled = r.state!=='ok';
+  updateSteps(r);
+  if(cur>1 && r.state!=='ok'){ cur=1; [1,2,3].forEach(i=>$('step'+i).hidden=i!==1); updateSteps(r); }
+
+  // step 2 readouts
+  $('ageReadout').textContent = v.age!=null ? `${v.age} years old` : 'Enter age in step 1';
+  $('bmiReadout').innerHTML = bmi ? `${bmi.val.toFixed(1)} <span class="pill ${bmi.cat==='Normal'?'s5':bmi.cat==='Obese'?'s1':'s2'}">${bmi.cat}</span>` : 'Enter height and weight';
+
+  // step 3
+  $('student').innerHTML=`<div class="nm">${esc(v.name||'Unnamed student')}</div>
+    <div class="kv"><span>Grade & section</span><b>${esc(v.section||'–')}</b></div>
+    <div class="kv"><span>Age</span><b>${v.age??'–'}</b></div><div class="kv"><span>Sex</span><b>${v.sex==='F'?'F':'M'}</b></div>
+    <div class="kv"><span>PAR-Q+</span><b>${r.state==='ok'?(r.yes.length?'Cleared (doctor)':'Cleared'):'Not cleared'}</b></div>`;
+
+  const meter=s=>`<span class="meter" aria-hidden="true">${[1,2,3,4,5].map(i=>`<i style="${i<=s?`background:var(--r${s})`:''}"></i>`).join('')}</span>`;
+  const row=(k,c)=>{const cs=comps[k]; const raw=cs.tests.map(x=>`${x.t.name}: ${x.val==null?'—':x.val+' '+x.t.unit}`).join(' · ');
+    return `<div class="prow"><span class="c">${c.name}</span><span class="mr">${meter(cs.score)}<span class="pill s${cs.score}">${LABELS[cs.score]}</span></span><span class="raw">${raw}</span></div>`;};
+  const bodyRow=`<div class="prow"><span class="c">Body composition</span><span class="mr">${bmi?`<span class="pill ${bmi.cat==='Normal'?'s5':bmi.cat==='Obese'?'s1':'s2'}">${bmi.cat}</span>`:'<span class="pill s0">Not tested</span>'}</span>
+    <span class="raw">Height: ${v.height??'—'} cm · Weight: ${v.weight??'—'} kg · BMI: ${bmi?bmi.val.toFixed(1):'—'}</span></div>`;
+  const grp=kind=>Object.entries(COMPS).filter(([,c])=>c.kind===kind).map(([k,c])=>row(k,c)).join('');
+  $('profile').innerHTML=`<div class="pgroup"><h3>Health-related fitness</h3>${bodyRow}${grp('health')}</div><div class="pgroup"><h3>Skill-related fitness</h3>${grp('skill')}</div>`;
+
+  let focus=Object.keys(COMPS).filter(k=>comps[k].score>0&&comps[k].score<=3).sort((a,b)=>comps[a].score-comps[b].score||(COMPS[a].kind==='health'?-1:1));
+  let maintenance=false;
+  if(bmi&&(bmi.cat==='Overweight'||bmi.cat==='Obese')) focus.unshift('bodyOver');
+  if(bmi&&bmi.cat==='Underweight') focus.unshift('bodyUnder');
+  if(!focus.length){focus=['cardio','strength','flexibility'].filter(k=>comps[k].score);maintenance=true;}
+  focus=focus.slice(0,5);
+  const plans=focus.map(k=>{const s=k.startsWith('body')?1:comps[k].score;return {k,s,p:fitt(k,s,v,res)};});
+  const nameOf=k=>k==='bodyOver'?'Body composition (more daily activity)':k==='bodyUnder'?'Body composition (healthy weight gain)':COMPS[k].name;
+  $('fittIntro').textContent=maintenance?'All tested areas are Very good or better. This plan keeps them there.':plans.length?`Built for the ${plans.length} area${plans.length>1?'s':''} that need the most work, weakest first.`:'';
+  $('fittList').innerHTML=plans.length?plans.map(({k,s,p})=>{const pr=s<=2;
+    const why=k.startsWith('body')?`BMI ${bmi.val.toFixed(1)} · ${bmi.cat}`:`Current rating: ${LABELS[s]}`;
+    return `<article class="card${pr?' priority':''}"><div class="card-head"><div><h3>${nameOf(k)}</h3><p>${why}</p></div>${pr?'<span class="pill s1">Priority</span>':maintenance?'<span class="pill s5">Maintain</span>':'<span class="pill s3">Improve</span>'}</div>
+      <div class="fitt"><div><b>F</b><span><em>Frequency</em>${p.F}</span></div><div><b>I</b><span><em>Intensity</em>${p.I}</span></div><div><b>T</b><span><em>Time</em>${p.T}</span></div><div><b>T</b><span><em>Type</em>${p.Ty}</span></div></div>
+      <ul class="ex">${p.ex.map(e=>`<li>${e}</li>`).join('')}</ul><p class="prog"><b>Progress:</b> ${p.prog}</p></article>`;}).join(''):'<p class="empty">Enter test results in step 2 to build a program.</p>';
+
+  const week=DAYS.map(()=>[]);
+  const short={cardio:'Cardio',strength:'Strength',flexibility:'Stretch',reaction:'Reaction',balance:'Balance',coordination:'Hand-eye',power:'Power',agility:'Agility & speed',bodyOver:'Active 60',bodyUnder:'Strength'};
+  plans.forEach(({k,p},i)=>{const n=Math.min(p.days,6),opts=PATTERNS[n]||PATTERNS[3];let best=opts[0],bl=1e9;
+    opts.forEach((o,j)=>{const l=o.reduce((a,d)=>a+week[d].length,0)+(j===i%opts.length?-0.1:0);if(l<bl){bl=l;best=o;}});
+    best.forEach(d=>week[d].push(short[k])); if(k==='bodyOver') week[6].push('Active 60');});
+  $('week').innerHTML=week.map((it,d)=>`<div class="day"><h4>${DAYS[d]}</h4>${it.length?it.map(x=>`<span class="chip">${x}</span>`).join(''):'<span class="chip rest">Rest or light play</span>'}</div>`).join('');
+
+  const sp=matchSports(comps);
+  $('sports').innerHTML=sp.length?sp.slice(0,3).map((s,i)=>{const top=s.parts.filter(p=>p.s>=3).slice(0,2);
+    const reason=top.length?`Uses ${top.map(p=>`${COMPS[p.k].name.toLowerCase()} (${LABELS[p.s].toLowerCase()})`).join(' and ')}.`:'A good all-round match for this profile.';
+    const weak=s.parts.filter(p=>p.s<=2).sort((a,b)=>b.w-a.w)[0];
+    return `<div class="sport"><span class="rank">#${i+1} match</span><h3>${s.n}</h3><span class="pct">${s.pct}%</span><div class="bar"><i style="width:${s.pct}%"></i></div><p>${reason}</p>${weak?`<p class="prog">To play at a higher level, work on ${COMPS[weak.k].name.toLowerCase()}.</p>`:''}</div>`;}).join('')
+    :'<p class="empty">Enter skill-related test results to see sport matches.</p>';
+  $('alsoFit').innerHTML=sp.length>3?`<b>Also a good fit:</b> ${sp.slice(3,6).map(s=>`${s.n} (${s.pct}%)`).join(', ')}`:'';
+
+  const sex=res.sex;
+  $('guide').innerHTML=`<table><thead><tr><th>Test (${sex==='F'?'female':'male'})</th><th>Excellent</th><th>Very good</th><th>Good</th><th>Fair</th><th>Needs improvement</th></tr></thead><tbody>${
+    TESTS.map(t=>{const b=t.bands[sex],op=t.lower?'≤':'≥';return `<tr><td>${t.name} <span style="color:var(--muted)">(${t.unit})</span></td>${b.map(x=>`<td class="n">${op} ${x}</td>`).join('')}<td class="n">${t.lower?'>':'<'} ${b[3]}</td></tr>`;}).join('')}
+    <tr><td>BMI (kg/m²)</td><td colspan="5">Underweight &lt; 18.5 · Normal 18.5–24.9 · Overweight 25–29.9 · Obese ≥ 30</td></tr></tbody></table>`;
+
+  const lines=[`PFT FITT Plan – ${v.name||'Unnamed student'} (${v.section||'no section'}, Age ${v.age??'–'}, ${v.sex==='F'?'Female':'Male'})`,
+    `PAR-Q+: ${r.state==='ok'?(r.yes.length?'Cleared with medical clearance':'Cleared'):'Not cleared'}`, bmi?`BMI: ${bmi.val.toFixed(1)} (${bmi.cat})`:'','','FITNESS PROFILE',
+    ...Object.entries(COMPS).map(([k,c])=>`- ${c.name}: ${LABELS[comps[k].score]}`),'','FITT PROGRAM',
+    ...plans.flatMap(({k,p})=>[`* ${nameOf(k)}`,`  Frequency: ${p.F}`,`  Intensity: ${p.I}`,`  Time: ${p.T}`,`  Type: ${p.Ty}`,`  Exercises: ${p.ex.join('; ')}`]),
+    '','SUGGESTED SPORTS',...sp.slice(0,3).map((s,i)=>`${i+1}. ${s.n} (${s.pct}% match)`)];
+  lastText=lines.filter(l=>l!==null).join('\n').replace(/\n{3,}/g,'\n\n');
+
+  $('sampleNote').hidden = !String(v.name).includes('(sample)');
+  try{localStorage.setItem('pftDraft2',JSON.stringify(v));}catch(e){}
+}
+
+// ---------- events ----------
+buildInputs();
+let start=SAMPLE;
+try{const d=JSON.parse(localStorage.getItem('pftDraft2')||'null'); if(d) start=d;}catch(e){}
+fill(start); render();
+$('sheet').addEventListener('input',render);
+$('sheet').addEventListener('change',render);
+document.querySelectorAll('.step').forEach(b=>b.addEventListener('click',()=>go(+b.dataset.step)));
+$('to2').addEventListener('click',()=>go(2)); $('to3').addEventListener('click',()=>go(3));
+$('back1').addEventListener('click',()=>go(1)); $('back2').addEventListener('click',()=>go(2));
+$('sampleBtn').addEventListener('click',()=>{fill(SAMPLE);render();go(1);});
+$('clearBtn').addEventListener('click',()=>{fill({pdate:new Date().toISOString().slice(0,10)});render();go(1);$('name').focus();});
+// ---------- saved records ----------
+const REC_KEY='pftRecords';
+let currentId=null, pendingDelete=null;
+try{ currentId=localStorage.getItem('pftCurrentId'); }catch(e){}
+function getRecs(){ try{ return JSON.parse(localStorage.getItem(REC_KEY)||'[]'); }catch(e){ return []; } }
+function setRecs(r){ try{ localStorage.setItem(REC_KEY,JSON.stringify(r)); return true; }catch(e){ return false; } }
+function setCurrent(id){ currentId=id; try{ id?localStorage.setItem('pftCurrentId',id):localStorage.removeItem('pftCurrentId'); }catch(e){} }
+function fmtDate(t){ return new Date(t).toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }
+function saveToast(m){ $('saveToast').textContent=m; setTimeout(()=>$('saveToast').textContent='',3000); }
+function renderRecs(){
+  const all=getRecs().sort((a,b)=>b.savedAt-a.savedAt), q=$('recSearch').value.trim().toLowerCase();
+  const list=q?all.filter(r=>`${r.data.name} ${r.data.section}`.toLowerCase().includes(q)):all;
+  $('savedCount').textContent=`${all.length} saved on this device`;
+  $('saveBtn').textContent = currentId && all.some(r=>r.id===currentId) ? 'Save changes' : 'Save this student';
+  $('recList').innerHTML = list.length ? list.map(r=>{
+    const res=compute(r.data), rd=readiness(r.data), tested=Object.values(res.comps).filter(c=>c.score).length;
+    const del = pendingDelete===r.id
+      ? `<span class="meta">Delete this record?</span><button type="button" class="btn sm danger solid" data-act="yes" data-id="${r.id}">Delete</button><button type="button" class="btn sm" data-act="no" data-id="${r.id}">Keep</button>`
+      : `<button type="button" class="btn sm primary" data-act="load" data-id="${r.id}">Load</button><button type="button" class="btn sm danger" data-act="del" data-id="${r.id}">Delete</button>`;
+    return `<div class="rec${r.id===currentId?' current':''}"><div><div class="who">${esc(r.data.name||'Unnamed student')}${r.id===currentId?' · open now':''}</div>
+      <div class="meta">${esc(r.data.section||'No section')} · Age ${r.data.age??'–'} · PAR-Q+ ${rd.state==='ok'?'cleared':'not cleared'} · ${tested} of 8 components tested · Saved ${fmtDate(r.savedAt)}</div></div>
+      <div class="acts">${del}</div></div>`;}).join('')
+    : `<p class="empty" style="padding:10px 0">${all.length?'No saved record matches your search.':'No saved records yet. Fill in a student and click "Save this student".'}</p>`;
+}
+$('saveBtn').addEventListener('click',()=>{
+  const v=readVals(); if(!v.name){ saveToast('Enter the student\'s name in step 1 first.'); go(1); $('name').focus(); return; }
+  const recs=getRecs(); const now=Date.now(); let i=recs.findIndex(r=>r.id===currentId);
+  if(i>=0){ recs[i].data=v; recs[i].savedAt=now; } else { const id='r'+now.toString(36); recs.push({id,savedAt:now,data:v}); setCurrent(id); }
+  if(setRecs(recs)){ saveToast(i>=0?'Changes saved':'Student saved'); } else { saveToast('Could not save. This browser is blocking storage.'); }
+  renderRecs();
+});
+$('recList').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-act]'); if(!b) return; const id=b.dataset.id, act=b.dataset.act;
+  if(act==='load'){ const r=getRecs().find(x=>x.id===id); if(!r) return; fill(r.data); setCurrent(id); pendingDelete=null; render(); renderRecs();
+    go(readiness(r.data).state==='ok'?3:1); saveToast(`Loaded ${r.data.name||'record'}`); }
+  if(act==='del'){ pendingDelete=id; renderRecs(); }
+  if(act==='no'){ pendingDelete=null; renderRecs(); }
+  if(act==='yes'){ setRecs(getRecs().filter(x=>x.id!==id)); if(currentId===id) setCurrent(null); pendingDelete=null; renderRecs(); saveToast('Record deleted'); }
+});
+$('recSearch').addEventListener('input',renderRecs);
+$('clearBtn').addEventListener('click',()=>{ setCurrent(null); renderRecs(); });
+$('sampleBtn').addEventListener('click',()=>{ setCurrent(null); renderRecs(); });
+renderRecs();
+
+$('copyBtn').addEventListener('click',()=>{const done=m=>{$('toast').textContent=m;setTimeout(()=>$('toast').textContent='',2500);};
+  try{navigator.clipboard.writeText(lastText).then(()=>done('Summary copied'),()=>done('Copy is blocked here. Try again in a browser.'));}catch(e){done('Copy is blocked here. Try again in a browser.');}});
+
+$('printBtn').addEventListener('click',()=>{ $('printDate').textContent='Printed on '+new Date().toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'}); window.print(); });
+</script>
+
+<script>if("serviceWorker" in navigator && location.protocol.startsWith("http")){navigator.serviceWorker.register("sw.js").catch(()=>{});}</script>
+</body>
+</html>
